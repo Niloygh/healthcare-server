@@ -77,8 +77,26 @@ app.get('/doctors/:email', async (req, res) => {
     res.send(doctor);  
 });
     
+    app.patch('/doctors/schedule', async(req, res) => {
+      const {email, date} = req.body;
 
+      if (!email) {
+      return res.status(400).send({ message: "Email is required" });
+    }
+
+    const filter = {email: email};
+
+    const updateDoc = {
+      $set: {
+        date: date
+      }
+    }
+
+    const result = await doctorCollection.updateOne(filter, updateDoc, { upsert: true });
+    res.send(result);
     
+    
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
