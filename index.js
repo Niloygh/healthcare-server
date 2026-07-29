@@ -6,7 +6,7 @@ const app = express()
 require('dotenv').config()
 const port = 5000
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 
 app.use(cors());
@@ -36,13 +36,35 @@ async function run() {
 
     const database = client.db("healthcare");
     const doctorCollection = database.collection("doctors");
+    const paymentCollection = database.collection('payment')
 
 
+    app.post('/payment', async (req, res) => {
+      const { amount, doctorsId, doctorName, patientId, paymentDate, session_id } = req.body
 
 
-    app.get('/doctors', async(req, res) =>{
+      const isExistSession = await paymentCollection.findOne({ session_id })
+
+      if (isExistSession) {
+        return res.status(400).send({ message: "session already exist" })
+      }
+
+      const pay_result = await paymentCollection.insertOne({
+        session_id,
+        patientId,
+        doctorId: doctorsId,   // ← also fix the field name mismatch
+        doctorName,
+        amount: Number(amount),
+        paymentDate,
+      })
+
+      res.send({ pay_result })
+    })
+
+
+    app.get('/doctors', async (req, res) => {
       const result = await doctorCollection.find().toArray()
-      
+
       res.send(result)
     })
 
@@ -63,40 +85,50 @@ async function run() {
       res.send(result);
     });
 
+    app.get('/doctors/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
 
-app.get('/doctors/:email', async (req, res) => {
-  const email = req.params.email;
-    const query = { email: email };
+      const doctor = await doctorCollection.findOne(query);
 
-    const doctor = await doctorCollection.findOne(query);
+      if (!doctor) {
+        return res.status(404).send({ message: 'Doctor not found' });
+      }
 
-    if (!doctor) {
-      return res.status(404).send({ message: 'Doctor not found' });
-    }
+      res.send(doctor);
+    });
 
-    res.send(doctor);  
-});
-    
-    app.patch('/doctors/schedule', async(req, res) => {
-      const {email, date} = req.body;
+    app.patch('/doctors/schedule', async (req, res) => {
+      const { email, date } = req.body;
 
       if (!email) {
-      return res.status(400).send({ message: "Email is required" });
-    }
-
-    const filter = {email: email};
-
-    const updateDoc = {
-      $set: {
-        date: date
+        return res.status(400).send({ message: "Email is required" });
       }
-    }
 
-    const result = await doctorCollection.updateOne(filter, updateDoc, { upsert: true });
-    res.send(result);
-    
-    
+      const filter = { email: email };
+
+      const updateDoc = {
+        $set: {
+          date: date
+        }
+      }
+
+      const result = await doctorCollection.updateOne(filter, updateDoc, { upsert: true });
+      res.send(result);
+
+
     })
+
+    app.get('/doctor/:doctorId', async (req, res) => {
+      const { doctorId } = req.params
+      const query = { _id: new ObjectId(doctorId) }
+      const result = await doctorCollection.findOne(query)
+      res.send(result)
+    })
+
+
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
