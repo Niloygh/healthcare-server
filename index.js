@@ -40,7 +40,7 @@ async function run() {
 
 
     app.post('/payment', async (req, res) => {
-      const { amount, doctorsId, doctorName, patientId, paymentDate, session_id } = req.body
+      const { amount, doctorId, doctorName, patientId, paymentDate, request, session_id } = req.body
 
 
       const isExistSession = await paymentCollection.findOne({ session_id })
@@ -52,9 +52,10 @@ async function run() {
       const pay_result = await paymentCollection.insertOne({
         session_id,
         patientId,
-        doctorId: doctorsId,   // ← also fix the field name mismatch
+        doctorId,
         doctorName,
         amount: Number(amount),
+        request,
         paymentDate,
       })
 
