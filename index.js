@@ -37,18 +37,15 @@ async function run() {
     const database = client.db("healthcare");
     const doctorCollection = database.collection("doctors");
     const paymentCollection = database.collection('payment')
+    const appointmentCollection = database.collection('appointment')
 
-
+    // payment 
     app.post('/payment', async (req, res) => {
       const { amount, doctorId, doctorName, patientId, paymentDate, request, session_id } = req.body
-
-
       const isExistSession = await paymentCollection.findOne({ session_id })
-
       if (isExistSession) {
         return res.status(400).send({ message: "session already exist" })
       }
-
       const pay_result = await paymentCollection.insertOne({
         session_id,
         patientId,
@@ -58,13 +55,17 @@ async function run() {
         request,
         paymentDate,
       })
-
       res.send({ pay_result })
     })
 
-
     app.get('/doctors', async (req, res) => {
       const result = await doctorCollection.find().toArray()
+
+      res.send(result)
+    })
+
+    app.get('/limit-doctors', async (req, res) => {
+      const result = await doctorCollection.find().limit(4).toArray()
 
       res.send(result)
     })
@@ -86,6 +87,7 @@ async function run() {
       res.send(result);
     });
 
+    // doctor validation
     app.get('/doctors/:email', async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
@@ -99,6 +101,7 @@ async function run() {
       res.send(doctor);
     });
 
+    // schedule 
     app.patch('/doctors/schedule', async (req, res) => {
       const { email, date } = req.body;
 
@@ -120,11 +123,52 @@ async function run() {
 
     })
 
+
     app.get('/doctor/:doctorId', async (req, res) => {
       const { doctorId } = req.params
       const query = { _id: new ObjectId(doctorId) }
       const result = await doctorCollection.findOne(query)
       res.send(result)
+    })
+
+    // appointment 
+    app.post('/appointment', async (req, res) => {
+      const { clientEmail, clientId, doctorId, date, day, fee, symptoms, time, paymentStatus, } = req.body
+
+      const existingAppointment = await appointmentCollection.findOne({
+        clientId: clientId,
+        doctorId: doctorId,
+        appointmentComplete: false
+      });
+
+      console.log(existingAppointment)
+      
+
+      if (existingAppointment) {
+        return res.status(400).send({
+          success: false,
+          message: "You already have an active appointment with this doctor."
+        });
+      }
+
+
+      const appointment_result = await appointmentCollection.insertOne({
+        clientId,
+        clientEmail,
+        doctorId,
+        date,
+        day,
+        fre: Number(fee),
+        symptoms,
+        time,
+        appointmentStatus: 'pending',
+        appointmentComplete: false,
+        paymentStatus,
+      })
+      res.send({
+        success: true,
+        appointment_result
+      })
     })
 
 
