@@ -29,6 +29,16 @@ const client = new MongoClient(uri, {
   }
 });
 
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization
+
+  if(!authHeader || !authHeader.startWith('Bearer ')){
+  }
+
+  next()
+}
+
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -131,9 +141,9 @@ async function run() {
       res.send(result)
     })
 
-    // appointment 
+    // appointment post api
     app.post('/appointment', async (req, res) => {
-      const { clientEmail, clientId, doctorId, date, day, fee, symptoms, time, paymentStatus, } = req.body
+      const { clientEmail, clientId, doctorId, doctorName, date, day, fee, symptoms, time, paymentStatus, } = req.body
 
       const existingAppointment = await appointmentCollection.findOne({
         clientId: clientId,
@@ -156,9 +166,10 @@ async function run() {
         clientId,
         clientEmail,
         doctorId,
+        doctorName,
         date,
         day,
-        fre: Number(fee),
+        fee: Number(fee),
         symptoms,
         time,
         appointmentStatus: 'pending',
@@ -171,6 +182,13 @@ async function run() {
       })
     })
 
+    // appointment get api 
+    app.get('/appointment/:clientEmail', async (req, res) => {
+      const { clientEmail } = req.params
+      const query = { clientEmail: clientEmail }
+      const result = await appointmentCollection.find(query).toArray()
+      res.send(result)
+    })
 
 
 
