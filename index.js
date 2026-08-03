@@ -51,7 +51,7 @@ async function run() {
 
     // payment 
     app.post('/payment', async (req, res) => {
-      const { amount, doctorId, doctorName, patientId, paymentDate, request, session_id } = req.body
+      const { amount, doctorId, doctorName, patientId, paymentDate, request, session_id, appointmentId } = req.body
       const isExistSession = await paymentCollection.findOne({ session_id })
       if (isExistSession) {
         return res.status(400).send({ message: "session already exist" })
@@ -64,7 +64,16 @@ async function run() {
         amount: Number(amount),
         request,
         paymentDate,
+        appointmentId
       })
+      
+      if (appointmentId) {
+        await appointmentCollection.updateOne(
+          { _id: new ObjectId(appointmentId) },
+          { $set: { paymentStatus: true } }
+        )
+      }
+      
       res.send({ pay_result })
     })
 
@@ -187,6 +196,14 @@ async function run() {
       const { clientEmail } = req.params
       const query = { clientEmail: clientEmail }
       const result = await appointmentCollection.find(query).toArray()
+      res.send(result)
+    })
+
+    // appointment delete api 
+    app.delete('/appointment/:appointmentId', async(req , res) => {
+      const {appointmentId} = req.params
+      const query = {_id: new ObjectId(appointmentId)}
+      const result = await appointmentCollection.deleteOne(query)
       res.send(result)
     })
 
