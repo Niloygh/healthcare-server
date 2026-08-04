@@ -39,25 +39,25 @@ const verifyToken = async (req, res, next) => {
 
 
 
-  if(!authHeader || !authHeader.startsWith('Bearer ')){
-    return res.status(401).send({message: 'Unauthorized'})
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).send({ message: 'Unauthorized' })
   }
 
   const token = authHeader.split(" ")[1]
-  if(!token){
-    return res.status(401).send({message: 'Unauthorized'})
+  if (!token) {
+    return res.status(401).send({ message: 'Unauthorized' })
   }
 
   try {
-    const {payload} = await jwtVerify(token, JWKS);
+    const { payload } = await jwtVerify(token, JWKS);
 
     // console.log('jwt token', payload)
     req.user = payload
-    
+
     next();
   } catch (error) {
     console.log(error)
-    return res.status(401).send({message: 'Unauthorized access'})
+    return res.status(401).send({ message: 'Unauthorized access' })
   }
 }
 
@@ -72,7 +72,7 @@ async function run() {
     const paymentCollection = database.collection('payment')
     const appointmentCollection = database.collection('appointment')
     const reviewCollection = database.collection('review')
-    
+
 
     // payment 
     app.post('/payment', async (req, res) => {
@@ -91,14 +91,14 @@ async function run() {
         paymentDate,
         appointmentId
       })
-      
+
       if (appointmentId) {
         await appointmentCollection.updateOne(
           { _id: new ObjectId(appointmentId) },
           { $set: { paymentStatus: true } }
         )
       }
-      
+
       res.send({ pay_result })
     })
 
@@ -185,7 +185,7 @@ async function run() {
       });
 
       // console.log(existingAppointment)
-      
+
 
       if (existingAppointment) {
         return res.status(400).send({
@@ -224,52 +224,60 @@ async function run() {
     })
 
     // appointment delete api 
-    app.delete('/appointment/:appointmentId', async(req , res) => {
-      const {appointmentId} = req.params
-      const query = {_id: new ObjectId(appointmentId)}
+    app.delete('/appointment/:appointmentId', async (req, res) => {
+      const { appointmentId } = req.params
+      const query = { _id: new ObjectId(appointmentId) }
       const result = await appointmentCollection.deleteOne(query)
       res.send(result)
     })
 
     // appointment update api 
     app.patch('/appointment/:appointmentId', async (req, res) => {
-     
-        const appointmentId = req.params.appointmentId;
-        const { date, time, day } = req.body;
-        const filter = { _id: new ObjectId(appointmentId) };
 
-        const updateDoc = {
-          $set: {
-            date,
-            time,
-            day
-          },
-        };
+      const appointmentId = req.params.appointmentId;
+      const { date, time, day } = req.body;
+      const filter = { _id: new ObjectId(appointmentId) };
 
-        const result = await appointmentCollection.updateOne(filter, updateDoc);
-        res.send({ success: true, result });
-      });
+      const updateDoc = {
+        $set: {
+          date,
+          time,
+          day
+        },
+      };
 
-    
-      // review post api 
-      app.post('/review', async (req, res) => {
-        const {clientId, clientEmail, doctorId, doctorName, specialty, rating, comment, publishedDate, image } = req.body
+      const result = await appointmentCollection.updateOne(filter, updateDoc);
+      res.send({ success: true, result });
+    });
 
-        const review_result = await reviewCollection.insertOne({
-          clientId, 
-          clientEmail,
-          doctorId,
-          doctorName,
-          specialty,
-          rating: Number(rating),
-          comment,
-          publishedDate,
-          image
-        })
-        
-        res.send({ success: true, review_result })
-        
-})
+
+    // review post api 
+    app.post('/review', async (req, res) => {
+      const { clientId, clientEmail, doctorId, doctorName, specialty, rating, comment, publishedDate, image } = req.body
+
+      const review_result = await reviewCollection.insertOne({
+        clientId,
+        clientEmail,
+        doctorId,
+        doctorName,
+        specialty,
+        rating: Number(rating),
+        comment,
+        publishedDate,
+        image
+      })
+
+      res.send({ success: true, review_result })
+
+    })
+
+    // review get api 
+    app.get('/review/:clientId', async (req, res) => {
+      const { clientId } = req.params
+      const query = { clientId: clientId }
+      const result = await reviewCollection.find(query).toArray()
+      res.send(result)
+    })
 
 
 
