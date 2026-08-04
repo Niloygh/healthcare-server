@@ -71,6 +71,8 @@ async function run() {
     const doctorCollection = database.collection("doctors");
     const paymentCollection = database.collection('payment')
     const appointmentCollection = database.collection('appointment')
+    const reviewCollection = database.collection('review')
+    
 
     // payment 
     app.post('/payment', async (req, res) => {
@@ -165,7 +167,6 @@ async function run() {
 
     })
 
-
     app.get('/doctor/:doctorId', async (req, res) => {
       const { doctorId } = req.params
       const query = { _id: new ObjectId(doctorId) }
@@ -248,6 +249,29 @@ async function run() {
         const result = await appointmentCollection.updateOne(filter, updateDoc);
         res.send({ success: true, result });
       });
+
+    
+      // review post api 
+      app.post('/review', async (req, res) => {
+        const {clientId, clientEmail, doctorId, doctorName, specialty, rating, comment, publishedDate, image } = req.body
+
+        const review_result = await reviewCollection.insertOne({
+          clientId, 
+          clientEmail,
+          doctorId,
+          doctorName,
+          specialty,
+          rating: Number(rating),
+          comment,
+          publishedDate,
+          image
+        })
+        
+        res.send({ success: true, review_result })
+        
+})
+
+
 
 
 
