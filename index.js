@@ -7,6 +7,7 @@ require('dotenv').config()
 const port = process.env.PORT || 5000
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { createRemoteJWKSet, jwtVerify } = require('jose-cjs');
 
 
 app.use(cors());
@@ -29,13 +30,35 @@ const client = new MongoClient(uri, {
   }
 });
 
-const verifyToken = (req, res, next) => {
+
+const JWKS = createRemoteJWKSet(new URL(`${process.env.CLIENT_URL}/api/auth/jwks`));
+
+
+const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization
 
-  if(!authHeader || !authHeader.startWith('Bearer ')){
+
+
+  if(!authHeader || !authHeader.startsWith('Bearer ')){
+    return res.status(401).send({message: 'Unauthorized'})
   }
 
-  next()
+  const token = authHeader.split(" ")[1]
+  if(!token){
+    return res.status(401).send({message: 'Unauthorized'})
+  }
+
+  try {
+    const {payload} = await jwtVerify(token, JWKS);
+
+    // console.log('jwt token', payload)
+    req.user = payload
+    
+    next();
+  } catch (error) {
+    console.log(error)
+    return res.status(401).send({message: 'Unauthorized access'})
+  }
 }
 
 
@@ -151,7 +174,7 @@ async function run() {
     })
 
     // appointment post api
-    app.post('/appointment', async (req, res) => {
+    app.post('/appointment', verifyToken, async (req, res) => {
       const { clientEmail, clientId, doctorId, doctorName, date, day, fee, symptoms, time, paymentStatus, } = req.body
 
       const existingAppointment = await appointmentCollection.findOne({
@@ -206,6 +229,8 @@ async function run() {
       const result = await appointmentCollection.deleteOne(query)
       res.send(result)
     })
+
+    
 
 
 
