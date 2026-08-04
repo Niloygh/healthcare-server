@@ -183,7 +183,7 @@ async function run() {
         appointmentComplete: false
       });
 
-      console.log(existingAppointment)
+      // console.log(existingAppointment)
       
 
       if (existingAppointment) {
@@ -230,7 +230,24 @@ async function run() {
       res.send(result)
     })
 
-    
+    // appointment update api 
+    app.patch('/appointment/:appointmentId', async (req, res) => {
+     
+        const appointmentId = req.params.appointmentId;
+        const { date, time, day } = req.body;
+        const filter = { _id: new ObjectId(appointmentId) };
+
+        const updateDoc = {
+          $set: {
+            date,
+            time,
+            day
+          },
+        };
+
+        const result = await appointmentCollection.updateOne(filter, updateDoc);
+        res.send({ success: true, result });
+      });
 
 
 
