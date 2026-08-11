@@ -74,22 +74,23 @@ async function run() {
     const reviewCollection = database.collection('review')
 
 
-    // payment 
+    // payment post api
     app.post('/payment', async (req, res) => {
-      const { amount, doctorId, doctorName, patientId, paymentDate, request, session_id, appointmentId } = req.body
+      const { amount, doctorId, doctorName, clientId, paymentDate, request, session_id, appointmentId } = req.body
       const isExistSession = await paymentCollection.findOne({ session_id })
       if (isExistSession) {
         return res.status(400).send({ message: "session already exist" })
       }
       const pay_result = await paymentCollection.insertOne({
         session_id,
-        patientId,
+        clientId,
         doctorId,
         doctorName,
         amount: Number(amount),
         request,
         paymentDate,
-        appointmentId
+        appointmentId,
+        paymentStatus: "success"
       })
 
       if (appointmentId) {
@@ -101,6 +102,17 @@ async function run() {
 
       res.send({ pay_result })
     })
+
+    // payment get api
+    app.get('/all-payment/:clientId', async (req, res) => {
+      const { clientId } = req.params;
+      const query = { clientId: clientId }
+      const result = await paymentCollection.find(query).toArray()
+      console.log(result)
+      res.send(result)
+    })
+
+
 
     app.get('/doctors', async (req, res) => {
       const result = await doctorCollection.find().toArray()
@@ -174,6 +186,8 @@ async function run() {
       res.send(result)
     })
 
+
+
     // appointment post api
     app.post('/appointment', verifyToken, async (req, res) => {
       const { clientEmail, clientId, doctorId, doctorName, date, day, fee, symptoms, time, paymentStatus, } = req.body
@@ -184,7 +198,6 @@ async function run() {
         appointmentComplete: false
       });
 
-      // console.log(existingAppointment)
 
 
       if (existingAppointment) {
@@ -251,6 +264,7 @@ async function run() {
     });
 
 
+
     // review post api 
     app.post('/review', async (req, res) => {
       const { clientId, clientEmail, doctorId, doctorName, specialty, rating, comment, publishedDate, image } = req.body
@@ -279,6 +293,64 @@ async function run() {
       res.send(result)
     })
 
+    // review delete api 
+    app.delete('/review/:reviewId', async (req, res) => {
+      const { reviewId } = req.params
+      const query = { _id: new ObjectId(reviewId) }
+      const result = await reviewCollection.deleteOne(query)
+      res.send(result)
+    })
+
+    app.patch('/reviewEdit/:reviewId', async (req, res) => {
+      const { reviewId } = req.params
+      const { comment, rating } = req.params
+      const filter = { _id: new ObjectId(reviewId) };
+
+
+      const updateDoc = {
+        $set: {
+          comment,
+          rating,
+          publishedDate: new Date()
+        }
+      }
+
+
+    })
+
+
+    // patient dashboard get api 
+app.get('/patient/dashboard/:clientId', async(req, res) => {
+
+    const { clientId } = req.params;
+    const query = { clientId: clientId };
+
+    const reviewResult = await reviewCollection.find(query).toArray();
+    const paymentResult = await paymentCollection.find(query).toArray();
+    const appointmentResult = await appointmentCollection.find(query).toArray();
+
+    const totalTransactionsAmount = paymentResult.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+    const upcomingConsultations = appointmentResult.filter(app => !app.appointmentComplete);
+    
+
+    const historiesCount = appointmentResult.filter(app => app.appointmentComplete).length;
+
+    res.send({
+      upcomingClinicsCount: upcomingConsultations.length,
+      historiesCount: historiesCount,
+      totalTransactionsAmount: totalTransactionsAmount,
+      reviewsCount: reviewResult.length,
+      consultations: upcomingConsultations
+    });
+    
+});
+
+
+
+
+
+    // .toISOString()
 
 
 
