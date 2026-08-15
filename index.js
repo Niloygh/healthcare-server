@@ -72,6 +72,7 @@ async function run() {
     const paymentCollection = database.collection('payment')
     const appointmentCollection = database.collection('appointment')
     const reviewCollection = database.collection('review')
+    const prescriptionCollection = database.collection('prescription')
 
 
     // payment post api
@@ -108,7 +109,7 @@ async function run() {
       const { clientId } = req.params;
       const query = { clientId: clientId }
       const result = await paymentCollection.find(query).toArray()
-      console.log(result)
+      // console.log(result)
       res.send(result)
     })
 
@@ -190,7 +191,7 @@ async function run() {
 
     // appointment post api
     app.post('/appointment', verifyToken, async (req, res) => {
-      const { clientEmail, clientId, doctorId, doctorName, date, day, fee, symptoms, time, paymentStatus, } = req.body
+      const { clientEmail, clientId, clientName, doctorId, doctorName, date, day, fee, symptoms, time, paymentStatus, } = req.body
 
       const existingAppointment = await appointmentCollection.findOne({
         clientId: clientId,
@@ -211,6 +212,7 @@ async function run() {
       const appointment_result = await appointmentCollection.insertOne({
         clientId,
         clientEmail,
+        clientName,
         doctorId,
         doctorName,
         date,
@@ -320,32 +322,110 @@ async function run() {
 
 
     // patient dashboard get api 
-app.get('/patient/dashboard/:clientId', async(req, res) => {
+    app.get('/patient/dashboard/:clientId', async (req, res) => {
 
-    const { clientId } = req.params;
-    const query = { clientId: clientId };
+      const { clientId } = req.params;
+      const query = { clientId: clientId };
 
-    const reviewResult = await reviewCollection.find(query).toArray();
-    const paymentResult = await paymentCollection.find(query).toArray();
-    const appointmentResult = await appointmentCollection.find(query).toArray();
+      const reviewResult = await reviewCollection.find(query).toArray();
+      const paymentResult = await paymentCollection.find(query).toArray();
+      const appointmentResult = await appointmentCollection.find(query).toArray();
 
-    const totalTransactionsAmount = paymentResult.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      const totalTransactionsAmount = paymentResult.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
-    const upcomingConsultations = appointmentResult.filter(app => !app.appointmentComplete);
-    
+      const upcomingConsultations = appointmentResult.filter(app => !app.appointmentComplete);
 
-    const historiesCount = appointmentResult.filter(app => app.appointmentComplete).length;
 
-    res.send({
-      upcomingClinicsCount: upcomingConsultations.length,
-      historiesCount: historiesCount,
-      totalTransactionsAmount: totalTransactionsAmount,
-      reviewsCount: reviewResult.length,
-      consultations: upcomingConsultations
+      const historiesCount = appointmentResult.filter(app => app.appointmentComplete).length;
+
+      res.send({
+        upcomingClinicsCount: upcomingConsultations.length,
+        historiesCount: historiesCount,
+        totalTransactionsAmount: totalTransactionsAmount,
+        reviewsCount: reviewResult.length,
+        consultations: upcomingConsultations
+      });
+
     });
-    
-});
 
+
+
+    // doctor all api 
+    app.get('/doctor/all-appointment/:doctorId', async (req, res) => {
+      const { doctorId } = req.params;
+      const query = { doctorId: doctorId };
+      const result = await appointmentCollection.find(query).toArray();
+      // console.log(result)
+      res.send(result)
+    })
+
+    // Update appointment status (accept/reject)
+    app.patch('/appointment/status/:appointmentId', async (req, res) => {
+      const { appointmentId } = req.params;
+      const { appointmentStatus } = req.body;
+
+      const filter = { _id: new ObjectId(appointmentId) };
+      const updateDoc = {
+        $set: {
+          appointmentStatus: appointmentStatus
+        }
+      };
+
+      const result = await appointmentCollection.updateOne(filter, updateDoc);
+
+      if (result.modifiedCount > 0) {
+        res.send({ success: true, message: 'Status updated successfully', result });
+      } else {
+        res.status(400).send({ success: false, message: 'Failed to update status' });
+      }
+
+    });
+
+
+    // prescribe post api 
+    // Prescription POST & Complete Appointment API
+    app.post('/appointment/prescribe/', async (req, res) => {
+      const { doctorId, doctorName, clientId, clientName, appointmentId, diagnosis, medications, advisoryNotes } = req.body;
+
+      const filter = { _id: new ObjectId(appointmentId) };
+
+      const updateAppointment = {
+        $set: {
+          appointmentComplete: true,
+        }
+      }
+
+      const prescriptionResult = await prescriptionCollection.insertOne({
+        doctorId,
+        doctorName,
+        clientId,
+        clientName,
+        appointmentId,
+        diagnosis,
+        medications,
+        advisoryNotes,
+      })
+
+      const appointmentResult = await appointmentCollection.updateOne(filter, updateAppointment);
+
+      res.send({ success: true, message: 'Prescription issued successfully', appointmentResult, prescriptionResult });
+      
+
+      // const updateDoc = {
+      //     $set: {
+      //         appointmentComplete: true,
+      //         prescription: {
+      //             diagnosis,
+      //             medications,
+      //             advisoryNotes,
+      //             createdAt: new Date()
+      //         }
+      //     }
+      // };
+
+      // const result = await appointmentCollection.updateOne(filter, updateDoc);
+      // res.send({ success: true, message: 'Prescription issued successfully', result });
+    });
 
 
 
