@@ -269,11 +269,11 @@ async function run() {
 
     // review post api 
     app.post('/review', async (req, res) => {
-      const { clientId, clientEmail, doctorId, doctorName, specialty, rating, comment, publishedDate, image } = req.body
+      const { clientId, clientName, doctorId, doctorName, specialty, rating, comment, publishedDate, image } = req.body
 
       const review_result = await reviewCollection.insertOne({
         clientId,
-        clientEmail,
+        clientName,
         doctorId,
         doctorName,
         specialty,
@@ -332,10 +332,7 @@ async function run() {
       const appointmentResult = await appointmentCollection.find(query).toArray();
 
       const totalTransactionsAmount = paymentResult.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-
       const upcomingConsultations = appointmentResult.filter(app => !app.appointmentComplete);
-
-
       const historiesCount = appointmentResult.filter(app => app.appointmentComplete).length;
 
       res.send({
@@ -345,12 +342,54 @@ async function run() {
         reviewsCount: reviewResult.length,
         consultations: upcomingConsultations
       });
-
     });
 
 
 
+
     // doctor all api 
+
+    app.get('/doctor/dashboard/:doctorId', async (req, res) => {
+
+      const { doctorId } = req.params;
+      const query = { doctorId: doctorId };
+
+      const today = new Date().toLocaleDateString('en-CA', {
+        timeZone: 'Asia/Dhaka'
+      });
+
+      const dateQuery = {
+        doctorId: doctorId,
+        date: today
+      };
+
+
+      const reviewResult = await reviewCollection.find(query).toArray();
+      const appointmentResult = await appointmentCollection.find(query).toArray();
+      const TodayAppointment = await appointmentCollection.find(dateQuery).toArray();
+
+      const totalRating = reviewResult.reduce(
+        (sum, review) => sum + Number(review.rating || 0),
+        0
+      );
+
+      const averageRating =
+        reviewResult.length > 0
+          ? (totalRating / reviewResult.length).toFixed(1)
+          : "0.0";
+
+
+      res.send({
+        totalPatient: appointmentResult.length,
+        todayAppointment: TodayAppointment.length,
+        reviewsCount: reviewResult.length,
+        totalReview: reviewResult,
+        averageRating: Number(averageRating),
+      });
+    });
+
+
+
     app.get('/doctor/all-appointment/:doctorId', async (req, res) => {
       const { doctorId } = req.params;
       const query = { doctorId: doctorId };
@@ -382,18 +421,20 @@ async function run() {
     });
 
 
-    // prescribe post api 
     // Prescription POST & Complete Appointment API
-    app.post('/appointment/prescribe/', async (req, res) => {
+    app.post('/appointment/prescribe', async (req, res) => {
       const { doctorId, doctorName, clientId, clientName, appointmentId, diagnosis, medications, advisoryNotes } = req.body;
 
       const filter = { _id: new ObjectId(appointmentId) };
 
       const updateAppointment = {
         $set: {
+          appointmentStatus: 'success',
           appointmentComplete: true,
         }
       }
+
+      const prescriptionDate = new Date().toISOString().split('T')[0];
 
       const prescriptionResult = await prescriptionCollection.insertOne({
         doctorId,
@@ -404,12 +445,13 @@ async function run() {
         diagnosis,
         medications,
         advisoryNotes,
+        prescriptionDate,
       })
 
       const appointmentResult = await appointmentCollection.updateOne(filter, updateAppointment);
 
       res.send({ success: true, message: 'Prescription issued successfully', appointmentResult, prescriptionResult });
-      
+
 
       // const updateDoc = {
       //     $set: {
@@ -425,6 +467,38 @@ async function run() {
 
       // const result = await appointmentCollection.updateOne(filter, updateDoc);
       // res.send({ success: true, message: 'Prescription issued successfully', result });
+    });
+
+    app.get('/doctor/all-prescription/:doctorId', async (req, res) => {
+      const { doctorId } = req.params;
+      const query = { doctorId: doctorId }
+
+      const result = await prescriptionCollection.find(query).toArray()
+
+      if (!result) {
+        return res.status(404).send({ message: 'Prescription not found' });
+      }
+
+      res.send(result)
+    })
+
+    // Prescription Edit/Update API
+    app.patch('/appointment/prescription/:id', async (req, res) => {
+      const { id } = req.params;
+      const { diagnosis, medications, advisoryNotes } = req.body;
+
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          diagnosis,
+          medications,
+          advisoryNotes
+        }
+      };
+
+      const result = await prescriptionCollection.updateOne(filter, updateDoc);
+      res.send({ success: true, message: "Prescription updated successfully", result });
+
     });
 
 
